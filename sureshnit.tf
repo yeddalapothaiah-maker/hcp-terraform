@@ -1,30 +1,43 @@
-name: Upload to S3
+BUCKET_NAME = "your-bucket-name"
+FILE_NAME = "app.zip"
 
-on:
-  push:
-    branches:
-      - main
+s3 = boto3.client("s3")
 
-jobs:
-  upload:
-    runs-on: ubuntu-latest
+s3.upload_file(FILE_NAME, BUCKET_NAME, FILE_NAME)
+print("Uploaded to S3")
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+# ---------- HCP Terraform ----------
+TF_API_TOKEN = "your_hcp_token"
+WORKSPACE_ID = "ws-xxxxxxxxxxxxxxxx"
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
+url = "https://app.terraform.io/api/v2/runs"
 
-      - name: Upload files to S3
-        run: |
-          aws s3 sync . s3://your-bucket-name --delete \
-            --exclude ".git/*" \
-            --exclude ".github/*"
+headers = {
+    "Authorization": f"Bearer {TF_API_TOKEN}",
+    "Content-Type": "application/vnd.api+json"
+}
 
-      - name: Deployment Complete
-        run: echo "Files uploaded to S3 successfully!"
+payload = {
+    "data": {
+        "type": "runs",
+        "attributes": {
+            "message": "Triggered after S3 upload"
+        },
+        "relationships": {
+            "workspace": {
+                "data": {
+                    "type": "workspaces",
+                    "id": WORKSPACE_ID
+                }
+            }
+        }
+    }
+}
+
+response = requests.post(url, headers=headers, json=payload)
+
+if response.status_code == 201:
+    print("HCP Terraform run started successfully.")
+else:
+    print("Error:", response.status_code)
+    print(response.text)
